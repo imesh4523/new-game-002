@@ -14752,6 +14752,23 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
         }
       }
       
+      // If an agent is requested, automatically forward to telegram support chat if configured
+      if (validation.author === 'user' && session.status === 'open') {
+        try {
+          const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
+          if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
+            const { forwardSupportChatMessage } = await import('./telegram');
+            await forwardSupportChatMessage(
+              session.sessionToken,
+              session.userDisplayName,
+              "User has requested an agent: " + validation.body 
+            );
+          }
+        } catch(e) {
+            console.error(e)
+        }
+      }
+
       res.json(message);
     } catch (error) {
       if (error instanceof z.ZodError) {
