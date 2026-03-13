@@ -14752,20 +14752,20 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
         }
       }
       
-      // If an agent is requested, automatically forward to telegram support chat if configured
+      // If an agent is requested, notify the admin bot directly
       if (validation.author === 'user' && session.status === 'open') {
         try {
           const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
           if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
-            const { forwardSupportChatMessage } = await import('./telegram');
-            await forwardSupportChatMessage(
-              session.sessionToken,
+            const { notifyAdminOfAgentRequest } = await import('./telegram');
+            await notifyAdminOfAgentRequest(
               session.userDisplayName,
-              "User has requested an agent: " + validation.body 
+              validation.body,
+              session.sessionToken
             );
           }
         } catch(e) {
-            console.error(e)
+            console.error('Error notifying admin of agent request:', e)
         }
       }
 

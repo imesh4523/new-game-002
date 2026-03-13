@@ -1245,6 +1245,43 @@ Reply to this message to respond to the user.
   }
 }
 
+export async function notifyAdminOfAgentRequest(
+  userDisplayName: string,
+  messageBody: string,
+  sessionToken: string
+): Promise<boolean> {
+  try {
+    const chatIdSetting = await storage.getSystemSetting('telegram_chat_id');
+    
+    if (!chatIdSetting || !chatIdSetting.value) {
+      console.log('Telegram chat ID not configured for agent request notification');
+      return false;
+    }
+
+    const initialized = await initializeTelegramBot();
+    if (!initialized || !bot) {
+      return false;
+    }
+
+    const message = `
+🤖 AGENT REQUEST DETECTED
+
+👤 User: ${userDisplayName}
+📝 Message: ${messageBody}
+🏷️ Session Token: ${sessionToken}
+
+Please check the support chat to assist the user.
+    `.trim();
+
+    await bot.sendMessage(chatIdSetting.value, message);
+    console.log('✅ Agent request notification sent to admin bot');
+    return true;
+  } catch (error) {
+    console.error('Failed to send agent request notification:', error);
+    return false;
+  }
+}
+
 export async function sendMessageWithButton(
   chatId: string,
   messageText: string,
