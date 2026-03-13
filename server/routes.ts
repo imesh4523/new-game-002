@@ -14518,15 +14518,19 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
       };
     }
 
-    if (message === 'not_deposited_yet' || message === "i haven't deposited yet") {
+    if (message === 'not_deposited_yet' || message === "i haven't deposited yet" || message.includes("haven't deposited")) {
       return {
-        body: "Please complete your deposit first. You can go to the Deposit section, select your payment method, and follow the instructions. If you need help, feel free to ask!"
+        body: "Please complete your deposit first. You can go to the Deposit section, select your payment method, and follow the instructions. If you need help, feel free to ask!",
+        choices: [
+          { text: "How to deposit?", value: "how_to_deposit" },
+          { text: "Contact live agent", value: "contact_agent" }
+        ]
       };
     }
 
-    if (message === 'already_deposited' || message === "i've already deposited") {
+    if (message === 'already_deposited' || message === "i've already deposited" || message.includes("already deposited")) {
       return {
-        body: "Thank you. Please send your Transaction ID or Hash so I can check it in our system."
+        body: "Thank you! Please send your Transaction ID or Hash (e.g., 0x123...) so I can check it in our system for you."
       };
     }
 
@@ -14695,37 +14699,42 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
 
       // Update session status if agent requested
       if (validation.author === 'user') {
-        const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
-        
-        if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
-          await storage.updateSupportChatSession(sessionId, { status: 'active' });
-          // Update local session object for the forwarding check below
-          session.status = 'active';
-        }
+        try {
+          const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
+          
+          if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
+            await storage.updateSupportChatSession(sessionId, { status: 'active' });
+            // Update local session object for the forwarding check below
+            session.status = 'active';
+          }
 
-        if (autoReply) {
-          // Delay bot reply slightly for natural feel
-          setTimeout(async () => {
-            try {
-              const botMessage = await storage.createSupportChatMessage({
-                sessionId,
-                author: 'system',
-                body: autoReply.body,
-                metadata: { 
-                  choices: (autoReply as any).choices,
-                  systemNote: (autoReply as any).systemNote
-                }
-              });
+          if (autoReply) {
+            // Delay bot reply slightly for natural feel
+            setTimeout(async () => {
+              try {
+                const botMessage = await storage.createSupportChatMessage({
+                  sessionId,
+                  author: 'system',
+                  body: autoReply.body,
+                  metadata: { 
+                    choices: (autoReply as any).choices,
+                    systemNote: (autoReply as any).systemNote
+                  }
+                });
 
-              broadcastToClients({
-                type: 'support-chat:new-message',
-                sessionId,
-                message: botMessage
-              });
-            } catch (err) {
-              console.error('Error sending automated reply:', err);
-            }
-          }, 1000);
+                broadcastToClients({
+                  type: 'support-chat:new-message',
+                  sessionId,
+                  message: botMessage
+                });
+              } catch (err) {
+                console.error('Error sending automated reply:', err);
+              }
+            }, 1000);
+          }
+        } catch (autoReplyError) {
+          console.error('Error in automated reply logic:', autoReplyError);
+          // Don't fail the message creation if auto-reply fails
         }
       }
       

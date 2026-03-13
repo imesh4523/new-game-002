@@ -81,14 +81,19 @@ export default function TelegramChatWidget() {
         const data = JSON.parse(event.data);
         
         if (data.type === 'support-chat:new-message' && data.message && session) {
-          if (data.sessionId === session.id && data.message.author === 'support') {
-            setMessages(prev => [...prev, {
-              id: data.message.id,
-              author: data.message.author,
-              body: data.message.body,
-              createdAt: new Date(data.message.createdAt),
-              metadata: data.message.metadata
-            }]);
+          if (data.sessionId === session.id) {
+            setMessages(prev => {
+              // Avoid duplicate messages (especially for user messages which are added optimistically)
+              if (prev.some(m => m.id === data.message.id)) return prev;
+              
+              return [...prev, {
+                id: data.message.id,
+                author: data.message.author,
+                body: data.message.body,
+                createdAt: new Date(data.message.createdAt),
+                metadata: data.message.metadata
+              }];
+            });
           }
         }
       } catch (error) {
@@ -599,15 +604,24 @@ export default function TelegramChatWidget() {
         body: messageText,
         metadata: metadataToSubmit
       });
+      
       const result = await response.json();
       console.log('Message sent successfully:', result);
+      
+      // Update the optimistic message with the real one from server if needed 
+      setMessages(prev => prev.map(msg => msg.id === userMessage.id ? {
+        ...msg,
+        id: result.id,
+        createdAt: new Date(result.createdAt)
+      } : msg));
       
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Check if it's a session error (404/401)
+      // Remove optimistic message on permanent failure
+      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+
       if (error instanceof Error && (error.message.includes('not found') || error.message.includes('Not authenticated'))) {
-        // Clear invalid session and reset UI
         localStorage.removeItem('support_chat_session');
         localStorage.removeItem('support_chat_name');
         setSession(null);
@@ -620,13 +634,11 @@ export default function TelegramChatWidget() {
         });
       } else {
         toast({
-          title: "Error",
-          description: "Failed to send message. Please try again.",
+          title: "Send Failed",
+          description: "Failed to send message. Please click to try again.",
           variant: "destructive"
         });
       }
-      
-      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
     } finally {
       setIsSending(false);
     }
@@ -786,7 +798,7 @@ export default function TelegramChatWidget() {
                                   size="sm"
                                   className="justify-start text-left bg-white/5 hover:bg-white/10 border-white/10 text-xs py-1 h-auto"
                                   onClick={() => {
-                                    handleSendMessage(choice.text);
+                                    handleSendMessage(choice.value || choice.text);
                                   }}
                                 >
                                   {choice.text}
