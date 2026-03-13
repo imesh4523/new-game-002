@@ -14518,13 +14518,13 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
       };
     }
 
-    if (message === 'not_deposited_yet') {
+    if (message === 'not_deposited_yet' || message === "i haven't deposited yet") {
       return {
         body: "Please complete your deposit first. You can go to the Deposit section, select your payment method, and follow the instructions. If you need help, feel free to ask!"
       };
     }
 
-    if (message === 'already_deposited') {
+    if (message === 'already_deposited' || message === "i've already deposited") {
       return {
         body: "Thank you. Please send your Transaction ID or Hash so I can check it in our system."
       };

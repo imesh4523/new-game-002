@@ -558,9 +558,12 @@ export default function TelegramChatWidget() {
     }
   };
 
-  const handleSendMessage = async () => {
-    if ((!inputText.trim() && !selectedImage) || isSending) {
-      console.log('Cannot send: no content or already sending');
+  const handleSendMessage = async (overrideText?: string, overrideMetadata?: any) => {
+    const textToSubmit = overrideText !== undefined ? overrideText : inputText;
+    const metadataToSubmit = overrideMetadata !== undefined ? overrideMetadata : (selectedImage ? { image: selectedImage } : undefined);
+
+    if ((!textToSubmit.trim() && !metadataToSubmit) || isSending) {
+      if (!isSending) console.log('Cannot send: no content');
       return;
     }
 
@@ -574,20 +577,19 @@ export default function TelegramChatWidget() {
       return;
     }
 
-    const messageText = inputText.trim() || (selectedImage ? 'Image' : '');
-    const metadata = selectedImage ? { image: selectedImage } : undefined;
+    const messageText = textToSubmit.trim() || (selectedImage ? 'Image' : '');
     
     const userMessage: Message = {
       id: nanoid(),
       author: 'user',
       body: messageText,
       createdAt: new Date(),
-      metadata
+      metadata: metadataToSubmit
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputText('');
-    setSelectedImage(null);
+    if (overrideText === undefined) setInputText('');
+    if (overrideMetadata === undefined) setSelectedImage(null);
     setIsSending(true);
 
     try {
@@ -595,7 +597,7 @@ export default function TelegramChatWidget() {
       const response = await apiRequest('POST', `/api/support/chat/sessions/${session.id}/messages`, {
         author: 'user',
         body: messageText,
-        metadata
+        metadata: metadataToSubmit
       });
       const result = await response.json();
       console.log('Message sent successfully:', result);
@@ -784,8 +786,7 @@ export default function TelegramChatWidget() {
                                   size="sm"
                                   className="justify-start text-left bg-white/5 hover:bg-white/10 border-white/10 text-xs py-1 h-auto"
                                   onClick={() => {
-                                    setInputText(choice.text);
-                                    handleSendMessage();
+                                    handleSendMessage(choice.text);
                                   }}
                                 >
                                   {choice.text}
@@ -867,12 +868,7 @@ export default function TelegramChatWidget() {
                         size="sm"
                         className="whitespace-nowrap bg-white/5 hover:bg-white/10 border-white/10 text-[10px] h-7 px-3 rounded-full transition-all hover:scale-105 active:scale-95 text-slate-300"
                         onClick={() => {
-                          setInputText(text);
-                          // We wait for state update then send
-                          setTimeout(() => {
-                            const btn = document.querySelector('[data-testid="button-send-message"]') as HTMLButtonElement;
-                            btn?.click();
-                          }, 50);
+                          handleSendMessage(text);
                         }}
                       >
                         {text}
