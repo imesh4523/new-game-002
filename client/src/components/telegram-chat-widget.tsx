@@ -83,8 +83,20 @@ export default function TelegramChatWidget() {
         if (data.type === 'support-chat:new-message' && data.message && session) {
           if (data.sessionId === session.id) {
             setMessages(prev => {
-              // Avoid duplicate messages (especially for user messages which are added optimistically)
+              // Avoid duplicate messages by ID
               if (prev.some(m => m.id === data.message.id)) return prev;
+              
+              // Avoid duplicating optimistic user messages
+              if (data.message.author === 'user') {
+                const isOptimisticDuplicate = prev.some(m => 
+                  m.author === 'user' && 
+                  m.body === data.message.body &&
+                  // If created within the last 15 seconds
+                  Math.abs(m.createdAt.getTime() - new Date(data.message.createdAt).getTime()) < 15000
+                );
+                
+                if (isOptimisticDuplicate) return prev;
+              }
               
               return [...prev, {
                 id: data.message.id,
