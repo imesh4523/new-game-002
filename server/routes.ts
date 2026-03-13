@@ -14508,7 +14508,7 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
     const message = body.toLowerCase().trim();
     
     // 01: Why not arrived my deposit?
-    if (message.includes('not arrivied my deposit') || message.includes('why not arrived my deposit')) {
+    if (message.includes('not arrived my deposit') || message.includes('why not arrived my deposit') || message.includes('not arrivied my deposit')) {
       return {
         body: "I'm sorry to hear that. Have you completed the deposit in your wallet/bank yet?",
         choices: [
@@ -14606,21 +14606,21 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
     }
 
     // 02: How to reset password
-    if (message.includes('how to rest my password') || message.includes('reset my password')) {
+    if (message.includes('how to reset my password') || message.includes('reset my password') || message.includes('rest my password')) {
       return {
         body: "To reset your password:\n1. Go to the Login page.\n2. Click on 'Forgot Password'.\n3. Enter your registered email address.\n4. Check your email for a reset link.\n5. Click the link and set a new password.\n\nIf you don't receive the email, please check your spam folder."
       };
     }
 
     // 03: How to become VIP
-    if (message.includes('how to becaooe vip level') || message.includes('become vip')) {
+    if (message.includes('how to become vip level') || message.includes('become vip') || message.includes('becaooe vip')) {
       return {
         body: "To increase your VIP level:\n- VIP 1: Total team size 10+ with $10+ deposits.\n- VIP 2: Total team size 30+.\n- Higher VIP levels grant higher bet limits and special rewards.\n\nYou can check your current progress in the VIP section of your profile."
       };
     }
 
     // 04: Contact live agent
-    if (message.includes('conatct to live agent support') || message.includes('contact live agent')) {
+    if (message.includes('contact to live agent support') || message.includes('contact live agent') || message.includes('conatct to live agent')) {
       return {
         body: "I am connecting you to an agent. Please describe your issue in detail so we can help you faster.",
         systemNote: "agent_requested"
@@ -14693,9 +14693,16 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
         message
       });
 
-      // Handle Automated Reply
+      // Update session status if agent requested
       if (validation.author === 'user') {
         const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
+        
+        if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
+          await storage.updateSupportChatSession(sessionId, { status: 'active' });
+          // Update local session object for the forwarding check below
+          session.status = 'active';
+        }
+
         if (autoReply) {
           // Delay bot reply slightly for natural feel
           setTimeout(async () => {
@@ -14722,14 +14729,18 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
         }
       }
       
-      // Forward user messages to Telegram
-      if (validation.author === 'user') {
-        const { forwardSupportChatMessage } = await import('./telegram');
-        await forwardSupportChatMessage(
-          session.sessionToken,
-          session.userDisplayName,
-          validation.body
-        );
+      // Forward user messages to Telegram ONLY if session is active (agent connected)
+      if (validation.author === 'user' && session.status === 'active') {
+        try {
+          const { forwardSupportChatMessage } = await import('./telegram');
+          await forwardSupportChatMessage(
+            session.sessionToken,
+            session.userDisplayName,
+            validation.body
+          );
+        } catch (err) {
+          console.error('Telegram forwarding error:', err);
+        }
       }
       
       res.json(message);
