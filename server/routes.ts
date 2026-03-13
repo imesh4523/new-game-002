@@ -14539,7 +14539,7 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
                    /^[0-9a-f]{64}$/i.test(message) || 
                    /^[0-9]+$/.test(message);
 
-    if (isTxId && (body.length > 5)) { // Simple heuristic
+    if (isTxId && (message.length > 5)) { // Simple heuristic
       try {
         // Check transactions and deposit requests
         const [txn] = await db.select().from(schema.transactions)

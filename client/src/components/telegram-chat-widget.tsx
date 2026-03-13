@@ -564,14 +564,24 @@ export default function TelegramChatWidget() {
   };
 
   const handleSendMessage = async (overrideText?: any, overrideMetadata?: any) => {
-    // Only use overrideText if it's explicitly a string (prevents React event objects from being used as text)
+    console.log('handleSendMessage triggered:', { 
+      overrideText, 
+      activeOverrideText: typeof overrideText === 'string' ? overrideText : undefined,
+      inputText,
+      textToSubmit: (typeof overrideText === 'string' ? overrideText : undefined) !== undefined ? (typeof overrideText === 'string' ? overrideText : undefined) : inputText
+    });
+
     const activeOverrideText = typeof overrideText === 'string' ? overrideText : undefined;
-    
     const textToSubmit = activeOverrideText !== undefined ? activeOverrideText : inputText;
     const metadataToSubmit = overrideMetadata !== undefined ? overrideMetadata : (selectedImage ? { image: selectedImage } : undefined);
 
     if ((!textToSubmit || !textToSubmit.trim() && !metadataToSubmit) || isSending) {
-      if (!isSending) console.log('Cannot send: no content');
+      console.log('Cannot send message - validation failed:', {
+        hasText: !!textToSubmit,
+        isTrimEmpty: textToSubmit ? !textToSubmit.trim() : true,
+        hasMetadata: !!metadataToSubmit,
+        isSending
+      });
       return;
     }
 
@@ -921,7 +931,10 @@ export default function TelegramChatWidget() {
                   />
                   <Button
                     onClick={() => handleSendMessage()}
-                    disabled={(!inputText.trim() && !selectedImage) || isSending}
+                    disabled={
+                      isSending || 
+                      ((!inputText || inputText.trim().length === 0) && !selectedImage)
+                    }
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 px-4 shadow-lg shadow-purple-500/40"
                     data-testid="button-send-message"
                   >
