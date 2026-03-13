@@ -563,11 +563,14 @@ export default function TelegramChatWidget() {
     }
   };
 
-  const handleSendMessage = async (overrideText?: string, overrideMetadata?: any) => {
-    const textToSubmit = overrideText !== undefined ? overrideText : inputText;
+  const handleSendMessage = async (overrideText?: any, overrideMetadata?: any) => {
+    // Only use overrideText if it's explicitly a string (prevents React event objects from being used as text)
+    const activeOverrideText = typeof overrideText === 'string' ? overrideText : undefined;
+    
+    const textToSubmit = activeOverrideText !== undefined ? activeOverrideText : inputText;
     const metadataToSubmit = overrideMetadata !== undefined ? overrideMetadata : (selectedImage ? { image: selectedImage } : undefined);
 
-    if ((!textToSubmit.trim() && !metadataToSubmit) || isSending) {
+    if ((!textToSubmit || !textToSubmit.trim() && !metadataToSubmit) || isSending) {
       if (!isSending) console.log('Cannot send: no content');
       return;
     }
@@ -917,7 +920,7 @@ export default function TelegramChatWidget() {
                     data-testid="input-message"
                   />
                   <Button
-                    onClick={handleSendMessage}
+                    onClick={() => handleSendMessage()}
                     disabled={(!inputText.trim() && !selectedImage) || isSending}
                     className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 px-4 shadow-lg shadow-purple-500/40"
                     data-testid="button-send-message"
