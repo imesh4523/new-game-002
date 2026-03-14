@@ -14738,77 +14738,76 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
       // ONLY if bot is not already active with an agent
       if (validation.author === 'user') {
         try {
-          // If session is already active (agent connected), skip automated replies
-          if (session.status === 'active') {
-             console.log(`[Bot] Session ${sessionId} is active with agent, skipping automated reply.`);
-          } else {
-            const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
+          // Check if this message would trigger an automated reply
+          const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
+          
+          if (autoReply) {
+            // It's a bot command. We should send the bot reply locally.
+            // But we should NOT forward this message to Telegram to avoid noise for the agent.
             
-            if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
-              await storage.updateSupportChatSession(sessionId, { status: 'active' });
-              // Update local session object for the forwarding check below
-              session.status = 'active';
+            if ((autoReply as any).systemNote === 'agent_requested') {
+              // Only update status if not already active
+              if (session.status !== 'active') {
+                await storage.updateSupportChatSession(sessionId, { status: 'active' });
+                session.status = 'active';
+
+                // If just requested an agent, notify the admin bot
+                try {
+                  const { notifyAdminOfAgentRequest } = await import('./telegram');
+                  await notifyAdminOfAgentRequest(
+                    session.userDisplayName,
+                    validation.body,
+                    session.sessionToken
+                  );
+                } catch (e) {
+                  console.error('Error notifying admin of agent request:', e);
+                }
+              }
             }
 
-            if (autoReply) {
-              // Delay bot reply slightly for natural feel
-              setTimeout(async () => {
-                try {
-                  const botMessage = await storage.createSupportChatMessage({
-                    sessionId,
-                    author: 'system',
-                    body: autoReply.body,
-                    metadata: { 
-                      choices: (autoReply as any).choices,
-                      systemNote: (autoReply as any).systemNote
-                    }
-                  });
+            // Send automated reply locally
+            setTimeout(async () => {
+              try {
+                const botMessage = await storage.createSupportChatMessage({
+                  sessionId,
+                  author: 'system',
+                  body: autoReply.body,
+                  metadata: { 
+                    choices: (autoReply as any).choices,
+                    systemNote: (autoReply as any).systemNote
+                  }
+                });
 
-                  broadcastToClients({
-                    type: 'support-chat:new-message',
-                    sessionId,
-                    message: botMessage
-                  });
-                } catch (err) {
-                  console.error('Error sending automated reply:', err);
-                }
-              }, 1000);
+                broadcastToClients({
+                  type: 'support-chat:new-message',
+                  sessionId,
+                  message: botMessage
+                });
+              } catch (err) {
+                console.error('Error sending automated reply:', err);
+              }
+            }, 1000);
+
+            // Since this was an automated command, we STOP here and don't forward to Telegram
+            // unless it was the very first agent request (which we handled above)
+            console.log(`[Bot] Filtered bot command from Telegram: "${validation.body}"`);
+          } else {
+            // Not a bot command, if session is active, forward to Telegram
+            if (session.status === 'active') {
+              try {
+                const { forwardSupportChatMessage } = await import('./telegram');
+                await forwardSupportChatMessage(
+                  session.sessionToken,
+                  session.userDisplayName,
+                  validation.body
+                );
+              } catch (err) {
+                console.error('Telegram forwarding error:', err);
+              }
             }
           }
         } catch (autoReplyError) {
-          console.error('Error in automated reply logic:', autoReplyError);
-          // Don't fail the message creation if auto-reply fails
-        }
-      }
-      
-      // Forward user messages to Telegram ONLY if session is active (agent connected)
-      if (validation.author === 'user' && session.status === 'active') {
-        try {
-          const { forwardSupportChatMessage } = await import('./telegram');
-          await forwardSupportChatMessage(
-            session.sessionToken,
-            session.userDisplayName,
-            validation.body
-          );
-        } catch (err) {
-          console.error('Telegram forwarding error:', err);
-        }
-      }
-      
-      // If an agent is requested, notify the admin bot directly
-      if (validation.author === 'user' && session.status === 'open') {
-        try {
-          const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
-          if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
-            const { notifyAdminOfAgentRequest } = await import('./telegram');
-            await notifyAdminOfAgentRequest(
-              session.userDisplayName,
-              validation.body,
-              session.sessionToken
-            );
-          }
-        } catch(e) {
-            console.error('Error notifying admin of agent request:', e)
+          console.error('Error in message handling logic:', autoReplyError);
         }
       }
 
