@@ -894,21 +894,21 @@ export default function TelegramChatWidget() {
                 {messages.length < 10 && (
                   <div className="flex gap-2 overflow-x-auto pb-3 mb-1 no-scrollbar scroll-smooth">
                     {[
-                      "Why not arrived my deposit?",
-                      "How to reset my password",
-                      "How to become VIP level",
-                      "Contact live agent"
-                    ].map((text, i) => (
+                      { text: "Why not arrived my deposit?", value: "Why not arrived my deposit?" },
+                      { text: "How to reset my password", value: "How to reset my password" },
+                      { text: "How to become VIP level", value: "How to become VIP level" },
+                      { text: "Contact live agent", value: "contact_agent" }
+                    ].map((chip, i) => (
                       <Button
                         key={i}
                         variant="outline"
                         size="sm"
                         className="whitespace-nowrap bg-white/5 hover:bg-white/10 border-white/10 text-[10px] h-7 px-3 rounded-full transition-all hover:scale-105 active:scale-95 text-slate-300"
                         onClick={() => {
-                          handleSendMessage(text);
+                          handleSendMessage(chip.value);
                         }}
                       >
-                        {text}
+                        {chip.text}
                       </Button>
                     ))}
                   </div>

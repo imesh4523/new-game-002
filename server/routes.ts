@@ -14530,7 +14530,22 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
 
     if (message === 'already_deposited' || message === "i've already deposited" || message.includes("already deposited")) {
       return {
-        body: "Thank you! Please send your Transaction ID or Hash (e.g., 0x123...) so I can check it in our system for you."
+        body: "Thank you! Please send your Transaction ID or Hash (e.g., 0x123...) so I can check it in our system for you.",
+        choices: [
+          { text: "Go back to main menu", value: "back_to_menu" }
+        ]
+      };
+    }
+
+    if (message === 'back_to_menu') {
+      return {
+        body: "How can I assist you today?",
+        choices: [
+          { text: "Why not arrived my deposit?", value: "Why not arrived my deposit?" },
+          { text: "How to reset my password", value: "How to reset my password" },
+          { text: "How to become VIP level", value: "How to become VIP level" },
+          { text: "Contact live agent", value: "contact_agent" }
+        ]
       };
     }
 
@@ -14555,15 +14570,21 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
           const ownerId = txn ? txn.userId : req?.userId;
           if (userId && ownerId && userId !== ownerId) {
             return {
-              body: "I found this transaction, but it appears to belong to another account. Please ensure you are logged into the correct account or provide your own Transaction ID."
+              body: "I found this transaction, but it appears to belong to another account. Please ensure you are logged into the correct account or provide your own Transaction ID.",
+              choices: [
+                { text: "Go back to main menu", value: "back_to_menu" },
+                { text: "Contact live agent", value: "contact_agent" }
+              ]
             };
           }
            
-          if (!userId && ownerId) {
              return {
-               body: "I found this transaction, but it is associated with a registered user. Please login to your account to verify ownership and see more details."
+               body: "I found this transaction, but it is associated with a registered user. Please login to your account to verify ownership and see more details.",
+               choices: [
+                 { text: "Go back to main menu", value: "back_to_menu" },
+                 { text: "Contact live agent", value: "contact_agent" }
+               ]
              };
-          }
 
           const status = txn ? txn.status : req?.status;
           const amountValue = txn ? (txn.fiatAmount || txn.cryptoAmount) : req?.amount;
@@ -14597,11 +14618,19 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
           }
 
           return {
-            body: `📊 **Transaction Found!** \n\n**Amount**: ${amountValue} ${currency}\n**Status**: ${statusMsg}\n\n✅ **Solution**: ${solution}\n\nIs there anything else I can assist you with today?`
+            body: `📊 **Transaction Found!** \n\n**Amount**: ${amountValue} ${currency}\n**Status**: ${statusMsg}\n\n✅ **Solution**: ${solution}\n\nIs there anything else I can assist you with today?`,
+            choices: [
+              { text: "Go back to main menu", value: "back_to_menu" },
+              { text: "Contact live agent", value: "contact_agent" }
+            ]
           };
         } else {
           return {
-            body: "I couldn't find a transaction with that ID in our system yet. If you just sent it, please wait 2-5 minutes and try again. Also please ensure you provided the correct Transaction ID/Hash."
+            body: "I couldn't find a transaction with that ID in our system yet. If you just sent it, please wait 2-5 minutes and try again. Also please ensure you provided the correct Transaction ID/Hash.",
+            choices: [
+              { text: "Go back to main menu", value: "back_to_menu" },
+              { text: "Contact live agent", value: "contact_agent" }
+            ]
           };
         }
       } catch (e) {
@@ -14612,19 +14641,27 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
     // 02: How to reset password
     if (message.includes('how to reset my password') || message.includes('reset my password') || message.includes('rest my password')) {
       return {
-        body: "To reset your password:\n1. Go to the Login page.\n2. Click on 'Forgot Password'.\n3. Enter your registered email address.\n4. Check your email for a reset link.\n5. Click the link and set a new password.\n\nIf you don't receive the email, please check your spam folder."
+        body: "To reset your password:\n1. Go to the Login page.\n2. Click on 'Forgot Password'.\n3. Enter your registered email address.\n4. Check your email for a reset link.\n5. Click the link and set a new password.\n\nIf you don't receive the email, please check your spam folder.",
+        choices: [
+          { text: "Go back to main menu", value: "back_to_menu" },
+          { text: "Contact live agent", value: "contact_agent" }
+        ]
       };
     }
 
     // 03: How to become VIP
     if (message.includes('how to become vip level') || message.includes('become vip') || message.includes('becaooe vip')) {
       return {
-        body: "To increase your VIP level:\n- VIP 1: Total team size 10+ with $10+ deposits.\n- VIP 2: Total team size 30+.\n- Higher VIP levels grant higher bet limits and special rewards.\n\nYou can check your current progress in the VIP section of your profile."
+        body: "To increase your VIP level:\n- VIP 1: Total team size 10+ with $10+ deposits.\n- VIP 2: Total team size 30+.\n- Higher VIP levels grant higher bet limits and special rewards.\n\nYou can check your current progress in the VIP section of your profile.",
+        choices: [
+          { text: "Go back to main menu", value: "back_to_menu" },
+          { text: "Contact live agent", value: "contact_agent" }
+        ]
       };
     }
 
     // 04: Contact live agent
-    if (message.includes('contact to live agent support') || message.includes('contact live agent') || message.includes('conatct to live agent')) {
+    if (message === 'contact_agent' || message === 'contact live agent') {
       return {
         body: "I am connecting you to an agent. Please describe your issue in detail so we can help you faster.",
         systemNote: "agent_requested"
@@ -14698,39 +14735,45 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
       });
 
       // Update session status if agent requested
+      // ONLY if bot is not already active with an agent
       if (validation.author === 'user') {
         try {
-          const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
-          
-          if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
-            await storage.updateSupportChatSession(sessionId, { status: 'active' });
-            // Update local session object for the forwarding check below
-            session.status = 'active';
-          }
+          // If session is already active (agent connected), skip automated replies
+          if (session.status === 'active') {
+             console.log(`[Bot] Session ${sessionId} is active with agent, skipping automated reply.`);
+          } else {
+            const autoReply = await handleAutomatedReply(sessionId, validation.body, (req as any).session?.userId);
+            
+            if (autoReply && (autoReply as any).systemNote === 'agent_requested') {
+              await storage.updateSupportChatSession(sessionId, { status: 'active' });
+              // Update local session object for the forwarding check below
+              session.status = 'active';
+            }
 
-          if (autoReply) {
-            // Delay bot reply slightly for natural feel
-            setTimeout(async () => {
-              try {
-                const botMessage = await storage.createSupportChatMessage({
-                  sessionId,
-                  author: 'system',
-                  body: autoReply.body,
-                  metadata: { 
-                    choices: (autoReply as any).choices,
-                    systemNote: (autoReply as any).systemNote
-                  }
-                });
+            if (autoReply) {
+              // Delay bot reply slightly for natural feel
+              setTimeout(async () => {
+                try {
+                  const botMessage = await storage.createSupportChatMessage({
+                    sessionId,
+                    author: 'system',
+                    body: autoReply.body,
+                    metadata: { 
+                      choices: (autoReply as any).choices,
+                      systemNote: (autoReply as any).systemNote
+                    }
+                  });
 
-                broadcastToClients({
-                  type: 'support-chat:new-message',
-                  sessionId,
-                  message: botMessage
-                });
-              } catch (err) {
-                console.error('Error sending automated reply:', err);
-              }
-            }, 1000);
+                  broadcastToClients({
+                    type: 'support-chat:new-message',
+                    sessionId,
+                    message: botMessage
+                  });
+                } catch (err) {
+                  console.error('Error sending automated reply:', err);
+                }
+              }, 1000);
+            }
           }
         } catch (autoReplyError) {
           console.error('Error in automated reply logic:', autoReplyError);

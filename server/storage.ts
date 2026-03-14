@@ -8889,6 +8889,29 @@ export class MemStorage implements IStorage {
     return messages.length;
   }
 
+  async closeInactiveSupportSessions(inactiveHours: number): Promise<number> {
+    const thresholdTime = new Date();
+    thresholdTime.setHours(thresholdTime.getHours() - inactiveHours);
+
+    let closedCount = 0;
+    for (const [id, session] of this.supportChatSessions.entries()) {
+      if ((session.status === 'open' || session.status === 'active')) {
+        const lastActivity = session.lastMessageAt || session.createdAt;
+        if (lastActivity < thresholdTime) {
+          session.status = 'closed';
+          session.closedAt = new Date();
+          this.supportChatSessions.set(id, session);
+          closedCount++;
+        }
+      }
+    }
+
+    if (closedCount > 0) {
+      console.log(`🧹 [MEM-CLEANUP] Closed ${closedCount} inactive support session(s)`);
+    }
+    return closedCount;
+  }
+
   async createQuickReply(payload: { shortcut: string; message: string; createdBy: string }): Promise<QuickReply> {
     const quickReply: QuickReply = {
       id: randomUUID(),
