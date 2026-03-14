@@ -614,6 +614,14 @@ app.use(async (req, res, next) => {
       console.error('❌ Failed to start Telegram auto-post scheduler:', error);
     }
 
+    // Start Support Chat Cleaner
+    try {
+      const { supportChatCleaner } = await import('./support-chat-cleaner');
+      supportChatCleaner.start();
+    } catch (error) {
+      console.error('❌ Failed to start support chat cleaner:', error);
+    }
+
     // Create a default agent account for testing (development only)
     if (process.env.NODE_ENV === 'development') {
       const { storage } = await import("./storage");

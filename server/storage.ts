@@ -462,6 +462,7 @@ export interface IStorage {
   getSupportChatMessages(sessionId: string, after?: Date): Promise<SupportChatMessage[]>;
   markMessagesDelivered(sessionId: string, deliveredAt?: Date): Promise<number>;
   deleteSupportChatMessages(sessionId: string): Promise<number>;
+  closeInactiveSupportSessions(inactiveHours: number): Promise<number>;
   
   // Quick reply methods
   createQuickReply(payload: { shortcut: string; message: string; createdBy: string }): Promise<QuickReply>;
@@ -604,6 +605,30 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error purging expired Telegram sessions:', error);
       throw error;
+    }
+  }
+
+  async closeInactiveSupportSessions(inactiveHours: number): Promise<number> {
+    try {
+      const thresholdTime = new Date();
+      thresholdTime.setHours(thresholdTime.getHours() - inactiveHours);
+
+      const result = await db.update(supportChatSessions)
+        .set({
+          status: 'closed',
+          closedAt: new Date()
+        })
+        .where(
+          and(
+            inArray(supportChatSessions.status, ['open', 'active']),
+            sql`COALESCE(${supportChatSessions.lastMessageAt}, ${supportChatSessions.createdAt}) < ${thresholdTime.toISOString()}`
+          )
+        );
+
+      return result.rowCount ?? 0;
+    } catch (error) {
+      console.error('Error closing inactive support sessions:', error);
+      return 0;
     }
   }
 

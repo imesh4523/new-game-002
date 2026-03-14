@@ -16123,12 +16123,21 @@ export async function registerRoutes(app: Express): Promise<{ httpServer: Server
     
     if (advancedSettings?.deepThinkingEnabled) {
       if (realPlayers.length === 0) {
-        // Bait mode — inflate crash point to attract next round bets
-        const minBait = parseFloat(advancedSettings.noBetBaitMinMultiplier || '7.00');
-        const maxBait = parseFloat(advancedSettings.noBetBaitMaxMultiplier || '20.00');
-        globalCrashPoint = minBait + Math.random() * (maxBait - minBait);
-        globalCrashPoint = Math.round(globalCrashPoint * 100) / 100;
-        console.log(`🎣 Bait Mode active. Global crash → ${globalCrashPoint}x`);
+        // Feature: Fair History Adjustment
+        // Instead of always baiting, allow a 40% chance of a low crash to keep history looking natural
+        const randomness = Math.random();
+        if (randomness < 0.40) {
+          globalCrashPoint = 1.01 + Math.random() * (1.99 - 1.01);
+          globalCrashPoint = Math.round(globalCrashPoint * 100) / 100;
+          console.log(`📉 Natural low crash when empty -> ${globalCrashPoint}x`);
+        } else {
+          // Bait mode (60% of empty rounds) — inflate crash point to attract next round bets
+          const minBait = parseFloat(advancedSettings.noBetBaitMinMultiplier || '7.00');
+          const maxBait = parseFloat(advancedSettings.noBetBaitMaxMultiplier || '20.00');
+          globalCrashPoint = minBait + Math.random() * (maxBait - minBait);
+          globalCrashPoint = Math.round(globalCrashPoint * 100) / 100;
+          console.log(`🎣 Bait Mode active. Global crash → ${globalCrashPoint}x`);
+        }
       } else {
         // Layer 3: Use advanced calculator per player
         let maxPersonal = 1.00;
